@@ -67,6 +67,15 @@
             background-color: #45a049;
         }
         
+        #pasteBtn {
+            background-color: #FF9800;
+            color: white;
+        }
+        
+        #pasteBtn:hover {
+            background-color: #e68900;
+        }
+        
         #refreshBtn {
             background-color: #2196F3;
             color: white;
@@ -93,6 +102,7 @@
         <textarea id="textArea" placeholder="Paste your text here..."></textarea>
         <div class="button-group">
             <button id="copyBtn">Copy All</button>
+            <button id="pasteBtn">Paste</button>
             <button id="refreshBtn">Refresh</button>
         </div>
         <div id="notification" class="notification">Copied to clipboard!</div>
@@ -101,6 +111,7 @@
     <script>
         const textArea = document.getElementById('textArea');
         const copyBtn = document.getElementById('copyBtn');
+        const pasteBtn = document.getElementById('pasteBtn');
         const refreshBtn = document.getElementById('refreshBtn');
         const notification = document.getElementById('notification');
 
@@ -115,6 +126,17 @@
                 })
                 .catch(err => {
                     alert('Failed to copy text');
+                });
+        });
+
+        pasteBtn.addEventListener('click', () => {
+            navigator.clipboard.readText()
+                .then(text => {
+                    textArea.value = text;
+                    textArea.focus();
+                })
+                .catch(err => {
+                    alert('Failed to paste. Please use Ctrl+V or long-press to paste manually.');
                 });
         });
 
