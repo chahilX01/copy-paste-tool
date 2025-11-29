@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Copy Paste Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        #textArea {
+            width: 100%;
+            min-height: 300px;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        button {
+            padding: 12px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        #copyBtn {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        #copyBtn:hover {
+            background-color: #45a049;
+        }
+        
+        #refreshBtn {
+            background-color: #2196F3;
+            color: white;
+        }
+        
+        #refreshBtn:hover {
+            background-color: #0b7dda;
+        }
+        
+        .notification {
+            display: none;
+            padding: 10px;
+            margin-top: 15px;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Copy Paste Tool</h1>
+        <textarea id="textArea" placeholder="Paste your text here..."></textarea>
+        <div class="button-group">
+            <button id="copyBtn">Copy All</button>
+            <button id="refreshBtn">Refresh</button>
+        </div>
+        <div id="notification" class="notification">Copied to clipboard!</div>
+    </div>
+
+    <script>
+        const textArea = document.getElementById('textArea');
+        const copyBtn = document.getElementById('copyBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const notification = document.getElementById('notification');
+
+        copyBtn.addEventListener('click', () => {
+            textArea.select();
+            navigator.clipboard.writeText(textArea.value)
+                .then(() => {
+                    notification.style.display = 'block';
+                    setTimeout(() => {
+                        notification.style.display = 'none';
+                    }, 2000);
+                })
+                .catch(err => {
+                    alert('Failed to copy text');
+                });
+        });
+
+        refreshBtn.addEventListener('click', () => {
+            textArea.value = '';
+            textArea.focus();
+        });
+    </script>
+</body>
+</html>
