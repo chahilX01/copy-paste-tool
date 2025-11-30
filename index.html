@@ -146,7 +146,8 @@
     </div>
 
     <script>
-        const API_URL = 'http://localhost:3000/api/clipboard';
+        // Use current host or localhost for API
+        const API_URL = `${window.location.protocol}//${window.location.hostname}:3000/api/clipboard`;
         const textArea = document.getElementById('textArea');
         const copyBtn = document.getElementById('copyBtn');
         const pasteBtn = document.getElementById('pasteBtn');

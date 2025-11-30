@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const app = express();
 const PORT = 3000;
@@ -30,7 +31,31 @@ app.post('/api/clipboard', (req, res) => {
     res.json({ success: true, data });
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-    console.log('Open this URL on any device on your network');
+// Get local IP addresses
+function getLocalIPs() {
+    const interfaces = os.networkInterfaces();
+    const addresses = [];
+    
+    for (let iface in interfaces) {
+        for (let alias of interfaces[iface]) {
+            if (alias.family === 'IPv4' && !alias.internal) {
+                addresses.push(alias.address);
+            }
+        }
+    }
+    return addresses;
+}
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log('\n=================================');
+    console.log('Copy Paste Server is running!');
+    console.log('=================================\n');
+    console.log('Access from this computer:');
+    console.log(`  http://localhost:${PORT}\n`);
+    console.log('Access from your phone or other devices:');
+    const ips = getLocalIPs();
+    ips.forEach(ip => {
+        console.log(`  http://${ip}:${PORT}`);
+    });
+    console.log('\n=================================\n');
 });
