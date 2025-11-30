@@ -32,6 +32,21 @@
             color: #333;
         }
         
+        .status {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .status.connected {
+            color: #4CAF50;
+        }
+        
+        .status.error {
+            color: #f44336;
+        }
+        
         #textArea {
             width: 100%;
             min-height: 300px;
@@ -47,6 +62,7 @@
             display: flex;
             gap: 10px;
             justify-content: center;
+            flex-wrap: wrap;
         }
         
         button {
@@ -76,6 +92,15 @@
             background-color: #e68900;
         }
         
+        #saveBtn {
+            background-color: #9C27B0;
+            color: white;
+        }
+        
+        #saveBtn:hover {
+            background-color: #7B1FA2;
+        }
+        
         #refreshBtn {
             background-color: #2196F3;
             color: white;
@@ -83,6 +108,15 @@
         
         #refreshBtn:hover {
             background-color: #0b7dda;
+        }
+        
+        #clearBtn {
+            background-color: #f44336;
+            color: white;
+        }
+        
+        #clearBtn:hover {
+            background-color: #da190b;
         }
         
         .notification {
@@ -99,51 +133,142 @@
 <body>
     <div class="container">
         <h1>Copy Paste Tool</h1>
+        <div id="status" class="status">Connecting...</div>
         <textarea id="textArea" placeholder="Paste your text here..."></textarea>
         <div class="button-group">
             <button id="copyBtn">Copy All</button>
             <button id="pasteBtn">Paste</button>
-            <button id="refreshBtn">Refresh</button>
+            <button id="saveBtn">Save to Cloud</button>
+            <button id="refreshBtn">Load from Cloud</button>
+            <button id="clearBtn">Clear All</button>
         </div>
-        <div id="notification" class="notification">Copied to clipboard!</div>
+        <div id="notification" class="notification">Success!</div>
     </div>
 
     <script>
+        const API_URL = 'http://localhost:3000/api/clipboard';
         const textArea = document.getElementById('textArea');
         const copyBtn = document.getElementById('copyBtn');
         const pasteBtn = document.getElementById('pasteBtn');
+        const saveBtn = document.getElementById('saveBtn');
         const refreshBtn = document.getElementById('refreshBtn');
+        const clearBtn = document.getElementById('clearBtn');
         const notification = document.getElementById('notification');
+        const status = document.getElementById('status');
+        
+        let lastTimestamp = 0;
 
+        // Show notification
+        function showNotification(message, isError = false) {
+            notification.textContent = message;
+            notification.style.backgroundColor = isError ? '#f44336' : '#4CAF50';
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 2000);
+        }
+
+        // Update status
+        function updateStatus(message, isConnected = true, isError = false) {
+            status.textContent = message;
+            status.className = 'status';
+            if (isConnected) status.classList.add('connected');
+            if (isError) status.classList.add('error');
+        }
+
+        // Load text from server
+        async function loadFromServer() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                
+                if (data.timestamp > lastTimestamp) {
+                    textArea.value = data.text;
+                    lastTimestamp = data.timestamp;
+                }
+                
+                updateStatus('✓ Connected - Auto-syncing', true);
+                return true;
+            } catch (error) {
+                updateStatus('✗ Server offline - Use manual paste', false, true);
+                return false;
+            }
+        }
+
+        // Save text to server
+        async function saveToServer() {
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: textArea.value })
+                });
+                const data = await response.json();
+                lastTimestamp = data.data.timestamp;
+                showNotification('Saved to cloud!');
+                updateStatus('✓ Connected - Auto-syncing', true);
+                return true;
+            } catch (error) {
+                showNotification('Failed to save - Server offline', true);
+                updateStatus('✗ Server offline', false, true);
+                return false;
+            }
+        }
+
+        // Copy button
         copyBtn.addEventListener('click', () => {
             textArea.select();
             navigator.clipboard.writeText(textArea.value)
-                .then(() => {
-                    notification.style.display = 'block';
-                    setTimeout(() => {
-                        notification.style.display = 'none';
-                    }, 2000);
-                })
-                .catch(err => {
-                    alert('Failed to copy text');
-                });
+                .then(() => showNotification('Copied to clipboard!'))
+                .catch(() => showNotification('Failed to copy', true));
         });
 
+        // Paste button
         pasteBtn.addEventListener('click', () => {
             navigator.clipboard.readText()
                 .then(text => {
                     textArea.value = text;
                     textArea.focus();
                 })
-                .catch(err => {
-                    alert('Failed to paste. Please use Ctrl+V or long-press to paste manually.');
+                .catch(() => {
+                    showNotification('Please use Ctrl+V to paste', true);
                 });
         });
 
-        refreshBtn.addEventListener('click', () => {
-            textArea.value = '';
-            textArea.focus();
+        // Save button
+        saveBtn.addEventListener('click', saveToServer);
+
+        // Refresh/Load button
+        refreshBtn.addEventListener('click', async () => {
+            const success = await loadFromServer();
+            if (success) {
+                showNotification('Loaded from cloud!');
+            } else {
+                showNotification('Failed to load - Server offline', true);
+            }
         });
+
+        // Clear button
+        clearBtn.addEventListener('click', async () => {
+            textArea.value = '';
+            await saveToServer();
+            showNotification('Cleared all text!');
+        });
+
+        // Auto-save when typing (debounced)
+        let saveTimeout;
+        textArea.addEventListener('input', () => {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                saveToServer();
+            }, 1000);
+        });
+
+        // Auto-refresh every 3 seconds
+        setInterval(loadFromServer, 3000);
+
+        // Initial load
+        loadFromServer();
     </script>
 </body>
 </html>
