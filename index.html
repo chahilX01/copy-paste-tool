@@ -145,6 +145,7 @@
         <div id="notification" class="notification">Success!</div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script>
         // Use current host or localhost for API
         const API_URL = `${window.location.protocol}//${window.location.hostname}:3000/api/clipboard`;
@@ -158,6 +159,29 @@
         const status = document.getElementById('status');
         
         let lastTimestamp = 0;
+        let isUpdatingFromSocket = false;
+        
+        // Connect to WebSocket
+        const socket = io(`${window.location.protocol}//${window.location.hostname}:3000`);
+
+        socket.on('connect', () => {
+            updateStatus('⚡ Connected - Real-time sync active', true);
+        });
+
+        socket.on('disconnect', () => {
+            updateStatus('✗ Disconnected - Reconnecting...', false, true);
+        });
+
+        socket.on('textUpdate', (data) => {
+            if (data.timestamp > lastTimestamp) {
+                isUpdatingFromSocket = true;
+                textArea.value = data.text;
+                lastTimestamp = data.timestamp;
+                setTimeout(() => {
+                    isUpdatingFromSocket = false;
+                }, 100);
+            }
+        });
 
         // Show notification
         function showNotification(message, isError = false) {
@@ -188,7 +212,6 @@
                     lastTimestamp = data.timestamp;
                 }
                 
-                updateStatus('✓ Connected - Auto-syncing', true);
                 return true;
             } catch (error) {
                 updateStatus('✗ Server offline - Use manual paste', false, true);
@@ -207,7 +230,6 @@
                 const data = await response.json();
                 lastTimestamp = data.data.timestamp;
                 showNotification('Saved to cloud!');
-                updateStatus('✓ Connected - Auto-syncing', true);
                 return true;
             } catch (error) {
                 showNotification('Failed to save - Server offline', true);
@@ -230,6 +252,7 @@
                 .then(text => {
                     textArea.value = text;
                     textArea.focus();
+                    socket.emit('updateText', text);
                 })
                 .catch(() => {
                     showNotification('Please use Ctrl+V to paste', true);
@@ -252,21 +275,21 @@
         // Clear button
         clearBtn.addEventListener('click', async () => {
             textArea.value = '';
+            socket.emit('updateText', '');
             await saveToServer();
             showNotification('Cleared all text!');
         });
 
-        // Auto-save when typing (debounced)
-        let saveTimeout;
+        // Real-time sync when typing
+        let typingTimeout;
         textArea.addEventListener('input', () => {
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(() => {
-                saveToServer();
-            }, 1000);
+            if (isUpdatingFromSocket) return;
+            
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socket.emit('updateText', textArea.value);
+            }, 300);
         });
-
-        // Auto-refresh every 3 seconds
-        setInterval(loadFromServer, 3000);
 
         // Initial load
         loadFromServer();
