@@ -92,24 +92,6 @@
             background-color: #e68900;
         }
         
-        #saveBtn {
-            background-color: #9C27B0;
-            color: white;
-        }
-        
-        #saveBtn:hover {
-            background-color: #7B1FA2;
-        }
-        
-        #refreshBtn {
-            background-color: #2196F3;
-            color: white;
-        }
-        
-        #refreshBtn:hover {
-            background-color: #0b7dda;
-        }
-        
         #clearBtn {
             background-color: #f44336;
             color: white;
@@ -138,50 +120,39 @@
         <div class="button-group">
             <button id="copyBtn">Copy All</button>
             <button id="pasteBtn">Paste</button>
-            <button id="saveBtn">Save to Cloud</button>
-            <button id="refreshBtn">Load from Cloud</button>
             <button id="clearBtn">Clear All</button>
         </div>
         <div id="notification" class="notification">Success!</div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        // Use current host or localhost for API
-        const API_URL = `${window.location.protocol}//${window.location.hostname}:3000/api/clipboard`;
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAqfdB1-0aSmZd84r-PMd8_SOhUsIUV1yk",
+            authDomain: "copy-paste-tool-6f071.firebaseapp.com",
+            databaseURL: "https://copy-paste-tool-6f071-default-rtdb.firebaseio.com",
+            projectId: "copy-paste-tool-6f071",
+            storageBucket: "copy-paste-tool-6f071.firebasestorage.app",
+            messagingSenderId: "633234921212",
+            appId: "1:633234921212:web:2f972618db9545c2be2979"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const clipboardRef = ref(database, 'clipboard/text');
+
         const textArea = document.getElementById('textArea');
         const copyBtn = document.getElementById('copyBtn');
         const pasteBtn = document.getElementById('pasteBtn');
-        const saveBtn = document.getElementById('saveBtn');
-        const refreshBtn = document.getElementById('refreshBtn');
         const clearBtn = document.getElementById('clearBtn');
         const notification = document.getElementById('notification');
         const status = document.getElementById('status');
         
-        let lastTimestamp = 0;
-        let isUpdatingFromSocket = false;
-        
-        // Connect to WebSocket
-        const socket = io(`${window.location.protocol}//${window.location.hostname}:3000`);
-
-        socket.on('connect', () => {
-            updateStatus('⚡ Connected - Real-time sync active', true);
-        });
-
-        socket.on('disconnect', () => {
-            updateStatus('✗ Disconnected - Reconnecting...', false, true);
-        });
-
-        socket.on('textUpdate', (data) => {
-            if (data.timestamp > lastTimestamp) {
-                isUpdatingFromSocket = true;
-                textArea.value = data.text;
-                lastTimestamp = data.timestamp;
-                setTimeout(() => {
-                    isUpdatingFromSocket = false;
-                }, 100);
-            }
-        });
+        let isUpdatingFromFirebase = false;
 
         // Show notification
         function showNotification(message, isError = false) {
@@ -201,41 +172,27 @@
             if (isError) status.classList.add('error');
         }
 
-        // Load text from server
-        async function loadFromServer() {
-            try {
-                const response = await fetch(API_URL);
-                const data = await response.json();
-                
-                if (data.timestamp > lastTimestamp) {
-                    textArea.value = data.text;
-                    lastTimestamp = data.timestamp;
-                }
-                
-                return true;
-            } catch (error) {
-                updateStatus('✗ Server offline - Use manual paste', false, true);
-                return false;
+        // Listen for real-time changes from Firebase
+        onValue(clipboardRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data !== null && data !== textArea.value) {
+                isUpdatingFromFirebase = true;
+                textArea.value = data;
+                setTimeout(() => {
+                    isUpdatingFromFirebase = false;
+                }, 100);
             }
-        }
+            updateStatus('⚡ Connected - Real-time sync active', true);
+        }, (error) => {
+            updateStatus('✗ Connection error', false, true);
+        });
 
-        // Save text to server
-        async function saveToServer() {
-            try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: textArea.value })
+        // Save to Firebase
+        function saveToFirebase() {
+            set(clipboardRef, textArea.value)
+                .catch((error) => {
+                    showNotification('Failed to sync', true);
                 });
-                const data = await response.json();
-                lastTimestamp = data.data.timestamp;
-                showNotification('Saved to cloud!');
-                return true;
-            } catch (error) {
-                showNotification('Failed to save - Server offline', true);
-                updateStatus('✗ Server offline', false, true);
-                return false;
-            }
         }
 
         // Copy button
@@ -252,47 +209,32 @@
                 .then(text => {
                     textArea.value = text;
                     textArea.focus();
-                    socket.emit('updateText', text);
+                    saveToFirebase();
                 })
                 .catch(() => {
                     showNotification('Please use Ctrl+V to paste', true);
                 });
         });
 
-        // Save button
-        saveBtn.addEventListener('click', saveToServer);
-
-        // Refresh/Load button
-        refreshBtn.addEventListener('click', async () => {
-            const success = await loadFromServer();
-            if (success) {
-                showNotification('Loaded from cloud!');
-            } else {
-                showNotification('Failed to load - Server offline', true);
-            }
-        });
-
         // Clear button
-        clearBtn.addEventListener('click', async () => {
+        clearBtn.addEventListener('click', () => {
             textArea.value = '';
-            socket.emit('updateText', '');
-            await saveToServer();
+            saveToFirebase();
             showNotification('Cleared all text!');
         });
 
         // Real-time sync when typing
         let typingTimeout;
         textArea.addEventListener('input', () => {
-            if (isUpdatingFromSocket) return;
+            if (isUpdatingFromFirebase) return;
             
             clearTimeout(typingTimeout);
             typingTimeout = setTimeout(() => {
-                socket.emit('updateText', textArea.value);
+                saveToFirebase();
             }, 300);
         });
 
-        // Initial load
-        loadFromServer();
+        updateStatus('Connecting to Firebase...', false);
     </script>
 </body>
 </html>
