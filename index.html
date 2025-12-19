@@ -4,6 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Copy Paste Tool</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Cross-device clipboard sharing tool with real-time sync">
+    <meta name="theme-color" content="#4CAF50">
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- iOS Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Copy Paste">
+    <link rel="apple-touch-icon" href="/icon-192.png">
     <style>
         * {
             margin: 0;
@@ -30,6 +41,31 @@
             text-align: center;
             margin-bottom: 20px;
             color: #333;
+        }
+        
+        .install-container {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        #installBtn {
+            display: none;
+            padding: 10px 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        #installBtn:hover {
+            transform: scale(1.05);
+        }
+        
+        #installBtn:active {
+            transform: scale(0.95);
         }
         
         .status {
@@ -115,6 +151,9 @@
 <body>
     <div class="container">
         <h1>Copy Paste Tool</h1>
+        <div class="install-container">
+            <button id="installBtn">📥 Install App</button>
+        </div>
         <div id="status" class="status">Connecting...</div>
         <textarea id="textArea" placeholder="Paste your text here..."></textarea>
         <div class="button-group">
@@ -236,6 +275,58 @@
         });
 
         updateStatus('Connecting to Firebase...', false);
+        
+        // PWA Install functionality
+        let deferredPrompt;
+        const installBtn = document.getElementById('installBtn');
+        
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent the mini-infobar from appearing on mobile
+            e.preventDefault();
+            // Stash the event so it can be triggered later
+            deferredPrompt = e;
+            // Show install button
+            installBtn.style.display = 'inline-block';
+        });
+        
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) {
+                return;
+            }
+            // Show the install prompt
+            deferredPrompt.prompt();
+            // Wait for the user to respond to the prompt
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User response to the install prompt: ${outcome}`);
+            // Clear the deferredPrompt for use again
+            deferredPrompt = null;
+            // Hide the install button
+            installBtn.style.display = 'none';
+            
+            if (outcome === 'accepted') {
+                showNotification('App installed successfully! 🎉');
+            }
+        });
+        
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then((registration) => {
+                        console.log('ServiceWorker registered:', registration);
+                    })
+                    .catch((error) => {
+                        console.log('ServiceWorker registration failed:', error);
+                    });
+            });
+        }
+        
+        // Check if app is already installed
+        window.addEventListener('appinstalled', () => {
+            console.log('App was installed');
+            installBtn.style.display = 'none';
+            showNotification('App installed! You can now use it offline. 🎉');
+        });
     </script>
 </body>
 </html>
