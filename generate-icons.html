@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate App Icons</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            text-align: center;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            margin: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>App Icon Generator</h1>
+    <p>Click the buttons below to download app icons</p>
+    
+    <canvas id="canvas192" width="192" height="192"></canvas>
+    <canvas id="canvas512" width="512" height="512"></canvas>
+    
+    <div>
+        <button onclick="downloadIcon(192)">Download 192x192 Icon</button>
+        <button onclick="downloadIcon(512)">Download 512x512 Icon</button>
+    </div>
+
+    <script>
+        function drawIcon(size) {
+            const canvas = document.getElementById(`canvas${size}`);
+            const ctx = canvas.getContext('2d');
+            
+            // Background
+            ctx.fillStyle = '#4CAF50';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Draw clipboard icon
+            ctx.fillStyle = 'white';
+            
+            // Clipboard top clip
+            const clipWidth = size * 0.3;
+            const clipHeight = size * 0.1;
+            const clipX = (size - clipWidth) / 2;
+            const clipY = size * 0.15;
+            
+            ctx.fillRect(clipX, clipY, clipWidth, clipHeight);
+            
+            // Main clipboard body
+            const bodyWidth = size * 0.5;
+            const bodyHeight = size * 0.6;
+            const bodyX = (size - bodyWidth) / 2;
+            const bodyY = size * 0.2;
+            
+            ctx.fillRect(bodyX, bodyY, bodyWidth, bodyHeight);
+            
+            // Lines on clipboard
+            ctx.fillStyle = '#4CAF50';
+            const lineMargin = bodyX + bodyWidth * 0.15;
+            const lineWidth = bodyWidth * 0.7;
+            const lineHeight = size * 0.04;
+            const lineSpacing = size * 0.08;
+            
+            for (let i = 0; i < 4; i++) {
+                ctx.fillRect(
+                    lineMargin,
+                    bodyY + bodyHeight * 0.2 + (i * lineSpacing),
+                    lineWidth,
+                    lineHeight
+                );
+            }
+        }
+        
+        function downloadIcon(size) {
+            drawIcon(size);
+            const canvas = document.getElementById(`canvas${size}`);
+            const link = document.createElement('a');
+            link.download = `icon-${size}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+        
+        // Draw icons on load
+        drawIcon(192);
+        drawIcon(512);
+    </script>
+</body>
+</html>
