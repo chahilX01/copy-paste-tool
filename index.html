@@ -182,7 +182,7 @@
         const notification = document.getElementById('notification');
         const status = document.getElementById('status');
         
-        let isUpdatingFromFirebase = false;
+        let isUpdatingFromSupabase = false;
 
         // Show notification
         function showNotification(message, isError = false) {
@@ -204,17 +204,25 @@
 
         // Load initial data
         async function loadClipboard() {
-            const { data, error } = await supabase
-                .from('clipboard')
-                .select('text')
-                .eq('id', 1)
-                .single();
-            
-            if (data && !error) {
-                textArea.value = data.text || '';
-                updateStatus('⚡ Connected - Real-time sync active', true);
-            } else {
-                updateStatus('✗ Connection error', false, true);
+            try {
+                const { data, error } = await supabase
+                    .from('clipboard')
+                    .select('text')
+                    .eq('id', 1)
+                    .single();
+                
+                if (error) {
+                    console.error('Supabase error:', error);
+                    updateStatus('✗ Connection error: ' + error.message, false, true);
+                } else if (data) {
+                    textArea.value = data.text || '';
+                    updateStatus('⚡ Connected - Real-time sync active', true);
+                } else {
+                    updateStatus('✗ No data found. Did you run the SQL setup?', false, true);
+                }
+            } catch (err) {
+                console.error('Load error:', err);
+                updateStatus('✗ Failed to connect: ' + err.message, false, true);
             }
         }
 
@@ -225,10 +233,10 @@
                 { event: '*', schema: 'public', table: 'clipboard' },
                 (payload) => {
                     if (payload.new && payload.new.text !== textArea.value) {
-                        isUpdatingFromFirebase = true;
+                        isUpdatingFromSupabase = true;
                         textArea.value = payload.new.text || '';
                         setTimeout(() => {
-                            isUpdatingFromFirebase = false;
+                            isUpdatingFromSupabase = false;
                         }, 100);
                     }
                 }
@@ -240,13 +248,14 @@
             });
 
         // Save to Supabase
-        async function saveToFirebase() {
+        async function saveToSupabase() {
             const { error } = await supabase
                 .from('clipboard')
                 .update({ text: textArea.value, timestamp: Date.now() })
                 .eq('id', 1);
             
             if (error) {
+                console.error('Supabase error:', error);
                 showNotification('Failed to sync', true);
             }
         }
@@ -268,7 +277,7 @@
                 .then(text => {
                     textArea.value = text;
                     textArea.focus();
-                    saveToFirebase();
+                    saveToSupabase();
                 })
                 .catch(() => {
                     showNotification('Please use Ctrl+V to paste', true);
@@ -278,18 +287,18 @@
         // Clear button
         clearBtn.addEventListener('click', () => {
             textArea.value = '';
-            saveToFirebase();
+            saveToSupabase();
             showNotification('Cleared all text!');
         });
 
         // Real-time sync when typing
         let typingTimeout;
         textArea.addEventListener('input', () => {
-            if (isUpdatingFromFirebase) return;
+            if (isUpdatingFromSupabase) return;
             
             clearTimeout(typingTimeout);
             typingTimeout = setTimeout(() => {
-                saveToFirebase();
+                saveToSupabase();
             }, 300);
         });
 
