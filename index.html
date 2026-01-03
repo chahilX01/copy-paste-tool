@@ -165,15 +165,25 @@
     </div>
 
     <script type="module">
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 
-        // Supabase config - This API key is safe to be public
-        // Security is handled by Row Level Security policies
-        const supabaseUrl = 'https://ngybqatplhtbxkygeawf.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5neWJxYXRwbGh0YnhreWdlYXdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwNjA5NDQsImV4cCI6MjA4MjYzNjk0NH0.wN-jBMwlSF2USNjo5EtfTq38bxozsCq3P_bbluRpFKk';
+        // Firebase config - This API key is safe to be public
+        // Security is handled by Firebase Database Rules
+        const firebaseConfig = {
+            apiKey: "AIzaSyAqfdB1-0aSmZd84r-PMd8_SOhUsIUV1yk",
+            authDomain: "copy-paste-tool-6f071.firebaseapp.com",
+            databaseURL: "https://copy-paste-tool-6f071-default-rtdb.firebaseio.com",
+            projectId: "copy-paste-tool-6f071",
+            storageBucket: "copy-paste-tool-6f071.firebasestorage.app",
+            messagingSenderId: "633234921212",
+            appId: "1:633234921212:web:2f972618db9545c2be2979"
+        };
 
-        // Initialize Supabase
-        const supabase = createClient(supabaseUrl, supabaseKey);
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const clipboardRef = ref(database, 'clipboard/text');
 
         const textArea = document.getElementById('textArea');
         const copyBtn = document.getElementById('copyBtn');
@@ -182,7 +192,7 @@
         const notification = document.getElementById('notification');
         const status = document.getElementById('status');
         
-        let isUpdatingFromSupabase = false;
+        let isUpdatingFromFirebase = false;
 
         // Show notification
         function showNotification(message, isError = false) {
@@ -202,66 +212,28 @@
             if (isError) status.classList.add('error');
         }
 
-        // Load initial data
-        async function loadClipboard() {
-            try {
-                const { data, error } = await supabase
-                    .from('clipboard')
-                    .select('text')
-                    .eq('id', 1)
-                    .single();
-                
-                if (error) {
-                    console.error('Supabase error:', error);
-                    updateStatus('✗ Connection error: ' + error.message, false, true);
-                } else if (data) {
-                    textArea.value = data.text || '';
-                    updateStatus('⚡ Connected - Real-time sync active', true);
-                } else {
-                    updateStatus('✗ No data found. Did you run the SQL setup?', false, true);
-                }
-            } catch (err) {
-                console.error('Load error:', err);
-                updateStatus('✗ Failed to connect: ' + err.message, false, true);
+        // Listen for real-time changes from Firebase
+        onValue(clipboardRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data !== null && data !== textArea.value) {
+                isUpdatingFromFirebase = true;
+                textArea.value = data;
+                setTimeout(() => {
+                    isUpdatingFromFirebase = false;
+                }, 100);
             }
+            updateStatus('⚡ Connected - Real-time sync active', true);
+        }, (error) => {
+            updateStatus('✗ Connection error', false, true);
+        });
+
+        // Save to Firebase
+        function saveToFirebase() {
+            set(clipboardRef, textArea.value)
+                .catch((error) => {
+                    showNotification('Failed to sync', true);
+                });
         }
-
-        // Listen for real-time changes from Supabase
-        const channel = supabase
-            .channel('clipboard-changes')
-            .on('postgres_changes', 
-                { event: '*', schema: 'public', table: 'clipboard' },
-                (payload) => {
-                    if (payload.new && payload.new.text !== textArea.value) {
-                        isUpdatingFromSupabase = true;
-                        textArea.value = payload.new.text || '';
-                        setTimeout(() => {
-                            isUpdatingFromSupabase = false;
-                        }, 100);
-                    }
-                }
-            )
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    updateStatus('⚡ Connected - Real-time sync active', true);
-                }
-            });
-
-        // Save to Supabase
-        async function saveToSupabase() {
-            const { error } = await supabase
-                .from('clipboard')
-                .update({ text: textArea.value, timestamp: Date.now() })
-                .eq('id', 1);
-            
-            if (error) {
-                console.error('Supabase error:', error);
-                showNotification('Failed to sync', true);
-            }
-        }
-
-        // Load initial clipboard data
-        loadClipboard();
 
         // Copy button
         copyBtn.addEventListener('click', () => {
@@ -277,7 +249,7 @@
                 .then(text => {
                     textArea.value = text;
                     textArea.focus();
-                    saveToSupabase();
+                    saveToFirebase();
                 })
                 .catch(() => {
                     showNotification('Please use Ctrl+V to paste', true);
@@ -287,22 +259,22 @@
         // Clear button
         clearBtn.addEventListener('click', () => {
             textArea.value = '';
-            saveToSupabase();
+            saveToFirebase();
             showNotification('Cleared all text!');
         });
 
         // Real-time sync when typing
         let typingTimeout;
         textArea.addEventListener('input', () => {
-            if (isUpdatingFromSupabase) return;
+            if (isUpdatingFromFirebase) return;
             
             clearTimeout(typingTimeout);
             typingTimeout = setTimeout(() => {
-                saveToSupabase();
+                saveToFirebase();
             }, 300);
         });
 
-        updateStatus('Connecting to Supabase...', false);
+        updateStatus('Connecting to Firebase...', false);
         
         // PWA Install functionality
         let deferredPrompt;
